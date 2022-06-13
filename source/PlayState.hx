@@ -4827,7 +4827,7 @@ class PlayState extends MusicBeatState
 	var lastBeatHit:Int = -1;
 
 	var idleAnims:Array<String> = ['idle', 'danceLeft', 'danceRight', 'hey']; //animations that can set the camera back to normal
-	//MAYBE SHOULD OF JUST MADE IT SO ALL ANIMATIONS THAT ARENT SING ANIMS CHANGE IT BACK TO NORMAL BUT IF YOU REALLY WANT THAT ADD IT YOURSELF
+	//MAYBE SHOULD HAVE JUST MADE IT SO ALL ANIMATIONS THAT ARENT SING ANIMS CHANGE IT BACK TO NORMAL BUT IF YOU REALLY WANT THAT ADD IT YOURSELF
 
 	override function beatHit()
 	{
