@@ -145,6 +145,8 @@ class PlayState extends MusicBeatState
 	private static var prevCamFollow:FlxPoint;
 	private static var prevCamFollowPos:FlxObject;
 
+	private var camOrigin:Array<Float> = [0, 0]; //the value that the game uses so it doesnt fly off when two of the same notes are hit or if theres sustain notes :))) (its what camFollow used to be)
+
 	public var strumLineNotes:FlxTypedGroup<StrumNote>;
 	public var opponentStrums:FlxTypedGroup<StrumNote>;
 	public var playerStrums:FlxTypedGroup<StrumNote>;
@@ -294,6 +296,9 @@ class PlayState extends MusicBeatState
 	private var keysArray:Array<Dynamic>;
 
 	var precacheList:Map<String, String> = new Map<String, String>();
+
+	public var mustHitSection:Bool = false;
+	public var gfSection:Bool = false;
 
 	override public function create()
 	{
@@ -3644,16 +3649,16 @@ class PlayState extends MusicBeatState
 	{
 		if(isDad)
 		{
-			camFollow.set(dad.getMidpoint().x + 150, dad.getMidpoint().y - 100);
-			camFollow.x += dad.cameraPosition[0] + opponentCameraOffset[0];
-			camFollow.y += dad.cameraPosition[1] + opponentCameraOffset[1];
+			camOrigin = [dad.getMidpoint().x + 150, dad.getMidpoint().y - 100]; //changed this so that in the unlikley event that a note being hit while the camera is being moved makes the camorigin based off that offset?!?!?! idk if that made sense but yeah
+			camOrigin[0] -= dad.cameraPosition[0] + opponentCameraOffset[0];
+			camOrigin[1] += dad.cameraPosition[1] + opponentCameraOffset[1];
 			tweenCamIn();
 		}
 		else
 		{
-			camFollow.set(boyfriend.getMidpoint().x - 100, boyfriend.getMidpoint().y - 100);
-			camFollow.x -= boyfriend.cameraPosition[0] - boyfriendCameraOffset[0];
-			camFollow.y += boyfriend.cameraPosition[1] + boyfriendCameraOffset[1];
+			camOrigin = [boyfriend.getMidpoint().x - 100, boyfriend.getMidpoint().y - 100];
+			camOrigin[0] -= boyfriend.cameraPosition[0] - boyfriendCameraOffset[0];
+			camOrigin[1] += boyfriend.cameraPosition[1] + boyfriendCameraOffset[1];
 
 			if (Paths.formatToSongPath(SONG.song) == 'tutorial' && cameraTwn == null && FlxG.camera.zoom != 1)
 			{
@@ -3665,6 +3670,7 @@ class PlayState extends MusicBeatState
 				});
 			}
 		}
+		camFollow.set(camOrigin[0], camOrigin[1]); //funy
 	}
 
 	function tweenCamIn() {
@@ -4389,6 +4395,21 @@ class PlayState extends MusicBeatState
 			{
 				char.playAnim(animToPlay, true);
 				char.holdTimer = 0;
+
+				if(!mustHitSection)
+				{ //the actual camera moving
+					switch(note.noteData) //i dont wanna use my brain to make a super cool solution!!!
+					{
+						case 0:
+							camFollow.set(camOrigin[0] - char.cameraMove, camOrigin[1]);
+						case 1:
+							camFollow.set(camOrigin[0], camOrigin[1] + char.cameraMove);
+						case 2:
+							camFollow.set(camOrigin[0], camOrigin[1] - char.cameraMove);
+						case 3:
+							camFollow.set(camOrigin[0] + char.cameraMove, camOrigin[1]);
+					}
+				}
 			}
 		}
 
@@ -4491,6 +4512,25 @@ class PlayState extends MusicBeatState
 						gf.playAnim('cheer', true);
 						gf.specialAnim = true;
 						gf.heyTimer = 0.6;
+					}
+				}
+				else
+				{
+					var char:Character = note.gfNote ? gf : boyfriend;
+
+					if(mustHitSection)
+					{ //the actual camera moving AGAIN
+						switch(note.noteData) //i dont wanna use my brain to make a super cool solution!!!
+						{
+							case 0:
+								camFollow.set(camOrigin[0] - char.cameraMove, camOrigin[1]);
+							case 1:
+								camFollow.set(camOrigin[0], camOrigin[1] + char.cameraMove);
+							case 2:
+								camFollow.set(camOrigin[0], camOrigin[1] - char.cameraMove);
+							case 3:
+								camFollow.set(camOrigin[0] + char.cameraMove, camOrigin[1]);
+						}
 					}
 				}
 			}
@@ -4786,6 +4826,9 @@ class PlayState extends MusicBeatState
 
 	var lastBeatHit:Int = -1;
 
+	var idleAnims:Array<String> = ['idle', 'danceLeft', 'danceRight', 'hey']; //animations that can set the camera back to normal
+	//MAYBE SHOULD OF JUST MADE IT SO ALL ANIMATIONS THAT ARENT SING ANIMS CHANGE IT BACK TO NORMAL BUT IF YOU REALLY WANT THAT ADD IT YOURSELF
+
 	override function beatHit()
 	{
 		super.beatHit();
@@ -4815,6 +4858,9 @@ class PlayState extends MusicBeatState
 			setOnLuas('gfSection', SONG.notes[Math.floor(curStep / 16)].gfSection);
 			// else
 			// Conductor.changeBPM(SONG.bpm);
+
+			mustHitSection = SONG.notes[Math.floor(curStep / 16)].mustHitSection; //why isnt this a thing already
+			gfSection = SONG.notes[Math.floor(curStep / 16)].gfSection;
 		}
 		// FlxG.log.add('change bpm' + SONG.notes[Std.int(curStep / 16)].changeBPM);
 
@@ -4837,14 +4883,26 @@ class PlayState extends MusicBeatState
 		if (gf != null && curBeat % Math.round(gfSpeed * gf.danceEveryNumBeats) == 0 && gf.animation.curAnim != null && !gf.animation.curAnim.name.startsWith("sing") && !gf.stunned)
 		{
 			gf.dance();
+			for(i in 0...idleAnims.length) { //resets camera back to normal if is idling
+				if(gfSection && gf.animation.curAnim.name.startsWith(idleAnims[i]))
+					camFollow.set(camOrigin[0], camOrigin[1]);
+			}
 		}
 		if (curBeat % boyfriend.danceEveryNumBeats == 0 && boyfriend.animation.curAnim != null && !boyfriend.animation.curAnim.name.startsWith('sing') && !boyfriend.stunned)
 		{
 			boyfriend.dance();
+			for(i in 0...idleAnims.length) {
+				if(mustHitSection && boyfriend.animation.curAnim.name.startsWith(idleAnims[i]))
+					camFollow.set(camOrigin[0], camOrigin[1]);
+			}
 		}
 		if (curBeat % dad.danceEveryNumBeats == 0 && dad.animation.curAnim != null && !dad.animation.curAnim.name.startsWith('sing') && !dad.stunned)
 		{
 			dad.dance();
+			for(i in 0...idleAnims.length) {
+				if(!mustHitSection && dad.animation.curAnim.name.startsWith(idleAnims[i]))
+					camFollow.set(camOrigin[0], camOrigin[1]);
+			}
 		}
 
 		switch (curStage)
